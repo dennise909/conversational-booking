@@ -1,101 +1,109 @@
-import Image from "next/image";
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { ChatList } from "@/components/ui/chat-list";
+import ChatScrollAnchor from "@/components/ui/chat-scroll-anchor";
+import { useEnterSubmit } from "@/lib/use-enter-submit";
+import { useActions, useUIState } from "ai/rsc";
+import { ArrowDownIcon, PlusIcon } from "lucide-react";
+import { type SubmitHandler, useForm } from "react-hook-form";
+import TextareaAutosize from "react-textarea-autosize";
+import { z } from "zod";
+import type { AI } from "./actions";
+import { UserMessage } from "./llm/message";
+
+const chatSchema = z.object({
+	message: z.string().min(1, "Message must not be empty"),
+});
+
+export type ChatInput = z.infer<typeof chatSchema>;
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+	const form = useForm<ChatInput>();
+	const { formRef, onKeyDown } = useEnterSubmit();
+	const [messages, setMessages] = useUIState<typeof AI>();
+	const { sendMessage } = useActions<typeof AI>();
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+	const onSubmit: SubmitHandler<ChatInput> = async (data) => {
+		const value = data.message.trim();
+		formRef.current?.reset();
+		if (!value) return;
+
+		setMessages((currentMessages) => [
+			...currentMessages,
+			{
+				id: Date.now(),
+				role: "user",
+				display: <UserMessage>{value}</UserMessage>,
+			},
+		]);
+		try {
+			const responseMessage = await sendMessage(value);
+			setMessages((currentMessages) => [...currentMessages, responseMessage]);
+		} catch (error) {
+			console.error(error);
+		}
+	};
+
+	return (
+		<main>
+			<div className="pb-[200px] pt-5 pt-10">
+				<ChatList messages={messages} />
+				<ChatScrollAnchor />
+			</div>
+			<div
+				className="fixed inset-x-0 bottom-0 w-full bg-gradient-to-b
+      from-muted/30 from-0% to-muted/30 to-50% peer-[[data-state=open]]:group-[]:lg:pl-[250px] peer-[[data-state=open]]:group-[]:xl:pl-300px pb-2"
+			>
+				<div className="mx-auto sm:max-w-2xl sm:px-4">
+					<div className="px-3 flex justify-center flex-col py-2 space-y-4 border-y shadow-lg bg-backgroundd sm:rounded-xl sm:border md:py-4 bg-white">
+						<form
+							ref={formRef}
+							onSubmit={form.handleSubmit(onSubmit)}
+							action=""
+						>
+							<div className="relative flex flex-col w-full overflow-hidden max-h-60 grow bg-background sm:rounded-md border">
+								<TextareaAutosize
+									tabIndex={0}
+									onKeyDown={onKeyDown}
+									placeholder="Type a message..."
+									className="min-h-[60px] w-full resize-none bg-transparent pl-4 pr-16 py-[1.3rem]
+              focus-within:outline-none sm:text-sm"
+									autoFocus
+									spellCheck={false}
+									autoComplete="off"
+									autoCorrect="off"
+									rows={1}
+									{...form.register("message")}
+								/>
+								<div className="absolute right-0 top-4 sm:right-4">
+									<Button
+										type="submit"
+										size="icon"
+										disabled={form.watch("message") === ""}
+									>
+										<ArrowDownIcon className="w-5 h-5" />
+										<span className="sr-only">Send message</span>
+									</Button>
+								</div>
+							</div>
+						</form>
+
+						<Button
+							variant="outline"
+							size="lg"
+							className="p-4 mt-4 rounded-full bg-background"
+							onClick={(event) => {
+								event.preventDefault();
+								window.location.reload();
+							}}
+						>
+							<PlusIcon className="w-5 h-5" />
+							<span>New chat</span>
+						</Button>
+					</div>
+				</div>
+			</div>
+		</main>
+	);
 }
