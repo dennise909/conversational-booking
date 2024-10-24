@@ -12,6 +12,7 @@ export function ChatList({messages}: MessagesProps) {
                 <div key={message.id} className='pb-4'>
                     {message.display}
                 </div>))}
+                <div>you are here</div>
         </div>
     )
 }   
